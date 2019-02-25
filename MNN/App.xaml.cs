@@ -95,6 +95,12 @@ namespace MNN
                         {
                             NN.WriteFile(Args[2]);
                         }
+                        else if (Args[1] == "learn")
+                        {
+                            int n = Convert.ToInt32(Args[2]);
+                            NN.MachineLearning(n);
+
+                        }
                         break;
 
                     case "trainingset":

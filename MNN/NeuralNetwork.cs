@@ -28,7 +28,7 @@ namespace MNN
 
         double[][] layer = new double[4][];
         double[][,] weight = new double[3][,];
-        bool loaded;
+        bool loaded, tsLoaded;
         List<Example> examples = new List<Example>();
         int exNo;
         //double[] y = new double[10];
@@ -49,6 +49,7 @@ namespace MNN
             exNo = 0;
 
             loaded = false;
+            tsLoaded = false;
         }
 
         /*public IEnumerable<int> LoadFile(string path)
@@ -188,9 +189,22 @@ namespace MNN
             loaded = true;
         }
         //TODO MachineLearning() che propaga avanti e indietro il segnale con batch da 10 esempi presi dal trainingset. Controlla andamento costfunction
-        public void MachineLearning()
+        public void MachineLearning(int N)
         {
-
+            Console.WriteLine(loaded);
+            Console.WriteLine(tsLoaded);
+            if (loaded == false || tsLoaded == false) return;
+            List<Example> temp = new List<Example>();
+           
+            for (int i = 0; i < N; i++)
+            {
+                
+                temp = examples.GetRange(exNo, 10);
+                exNo+=10;
+                BackPropagate(temp.ToArray());
+                Console.WriteLine("Costo iterazione " + i + " sulla batch "+exNo/10+":");
+                
+            }
         }
 
         public void WriteFile(string path)
@@ -275,7 +289,7 @@ namespace MNN
                     //Console.Write("\n");
                 }
             }
-            
+            tsLoaded = true;
         }
 
         public void ForwardPropagate(Example e)
@@ -424,6 +438,17 @@ namespace MNN
             //return layer[3][j] - y[j]; ATTENZIONE! ERRORE ALLA BASE. TESTARE FUNZIONAMENTO RETE DOPO IL CAMBIAMENTO
             return y[j] - layer[3][j];
         }
+
+        private double TotalError(double[] y)
+        {
+            double s = 0.0;
+            for(int j = 0; j < 10; j++)
+            {
+                s += Math.Pow(LocalError(j, y),2.0);
+            }
+            return s / 2.0;
+        }
+
         //TODO
         private double CostFunction()
         {
