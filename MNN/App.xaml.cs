@@ -101,6 +101,10 @@ namespace MNN
                             NN.MachineLearning(n);
 
                         }
+                        else if (Args[1] == "run")
+                        {
+                            NN.Run(Args[2]);
+                        }
                         break;
 
                     case "trainingset":

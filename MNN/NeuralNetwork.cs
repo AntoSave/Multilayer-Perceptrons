@@ -26,7 +26,7 @@ namespace MNN
 
     class NeuralNetwork
     {
-        const double _learningFactor = 0.2;
+        const double _learningFactor = 0.5;
         const double _momentum = 0.9;
 
         double[][] layer = new double[4][];
@@ -205,7 +205,7 @@ namespace MNN
             {
                 
                 temp = examples.GetRange(exNo, 10);
-                exNo+=10;
+                //exNo+=10;
                 BackPropagate(temp.ToArray(),out Cost);
                 Console.WriteLine("Costo iterazione " + i + " sulla batch "+exNo/10+":"+Cost);
                 
@@ -328,11 +328,39 @@ namespace MNN
                     {
                         temp = br_img.ReadByte();
                         color = Color.FromArgb(temp, temp, temp);
-                        img.SetPixel(i, j, color);
+                        img.SetPixel(j, i, color);
                     }
                 }
             }
             img.Save(tsPath + "\\" + imgName + ".png");
+        }
+
+        public void Run(string path)
+        {
+            Bitmap img = new Bitmap(path);
+            Example e;
+            double[] x = new double[784];
+            double[] y = new double[10];
+            char[] c = { '\\' ,'.'};
+            string[] temp=path.Split(c);
+            string imgName = temp[temp.Length - 2];
+            Console.WriteLine(imgName);
+            for(int i = 0; i < img.Width; i++)
+            {
+                for(int j = 0; j < img.Height; j++)
+                {
+                    x[j+i*img.Height]=(double)img.GetPixel(j, i).B;
+                }
+            }
+            for (int j = 0; j < 10; j++)
+            {
+                if (Convert.ToInt32(imgName) == j) y[j] = 1.0;
+                else y[j] = 0.0;
+            }
+
+            e = new Example(x, y);
+            ForwardPropagate(e);
+            Output();
         }
 
         public void ForwardPropagate(Example e)
@@ -531,7 +559,17 @@ namespace MNN
 
         public void Output()
         {
-            for (int i = 0; i < 10; i++) Console.WriteLine(layer[3][i]);
+            double temp1=layer[3][0];
+            int temp2=0;
+            for (int i = 0; i < 10; i++)
+            {
+                if (layer[3][i] > temp1) {
+                    temp1 = layer[3][i];
+                    temp2 = i;
+                }
+                //Console.WriteLine(layer[3][i]);
+            }
+            Console.WriteLine(temp2);
         }
 
         public virtual double Sigmoid(double x)
