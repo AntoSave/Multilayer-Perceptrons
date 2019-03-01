@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Drawing;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -21,16 +22,19 @@ namespace MNN
         }
     }
 
+
+
     class NeuralNetwork
     {
-        const double _learningFactor = 0.2;
-        const double _momentum = 0.2;
+        const double _learningFactor = 0.5;
+        const double _momentum = 0.9;
 
         double[][] layer = new double[4][];
         double[][,] weight = new double[3][,];
         bool loaded, tsLoaded;
         List<Example> examples = new List<Example>();
         int exNo;
+        string tsPath;
         //double[] y = new double[10];
 
 
@@ -191,6 +195,7 @@ namespace MNN
         //TODO MachineLearning() che propaga avanti e indietro il segnale con batch da 10 esempi presi dal trainingset. Controlla andamento costfunction
         public void MachineLearning(int N)
         {
+            double Cost;
             Console.WriteLine(loaded);
             Console.WriteLine(tsLoaded);
             if (loaded == false || tsLoaded == false) return;
@@ -200,9 +205,9 @@ namespace MNN
             {
                 
                 temp = examples.GetRange(exNo, 10);
-                exNo+=10;
-                BackPropagate(temp.ToArray());
-                Console.WriteLine("Costo iterazione " + i + " sulla batch "+exNo/10+":");
+                //exNo+=10;
+                BackPropagate(temp.ToArray(),out Cost);
+                Console.WriteLine("Costo iterazione " + i + " sulla batch "+exNo/10+":"+Cost);
                 
             }
         }
@@ -251,6 +256,7 @@ namespace MNN
             double[] x = new double[784];
             double[] y = new double[10];
             int rows, col, N, magic_img, magic_lab, temp;
+            tsPath = path;
             Console.WriteLine(path + "\\train-images.idx3-ubyte");
             Console.WriteLine(path + "\\train-labels.idx1-ubyte");
             using (BinaryReader br_img = new BinaryReader(new FileStream(path+"\\train-images.idx3-ubyte", FileMode.Open)))
@@ -290,6 +296,71 @@ namespace MNN
                 }
             }
             tsLoaded = true;
+        }
+
+        public void ExtractTS(int index)
+        {
+            if (tsLoaded == false) return;
+            string imgName;
+            int rows, col, N, magic_img, magic_lab,temp;
+            Bitmap img = new Bitmap(28, 28);
+            Color color;
+            using (BinaryReader br_img = new BinaryReader(new FileStream(tsPath + "\\train-images.idx3-ubyte", FileMode.Open)))
+            using (BinaryReader br_lab = new BinaryReader(new FileStream(tsPath + "\\train-labels.idx1-ubyte", FileMode.Open)))
+            {
+                magic_img = BitConverter.ToInt32(br_img.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0); //L'istruzione Reverse() serve perchè il PC è low endian
+                N = BitConverter.ToInt32(br_img.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0);
+                rows = BitConverter.ToInt32(br_img.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0);
+                col = BitConverter.ToInt32(br_img.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0);
+                magic_lab = BitConverter.ToInt32(br_lab.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0);
+                N = BitConverter.ToInt32(br_lab.ReadBytes(sizeof(Int32)).Reverse().ToArray(), 0); //RIDONDANZA
+                for (int i = 0; i < index; i++)
+                {
+                    for (int j = 0; j < col * rows; j++) { 
+                        br_img.ReadByte();
+                    }
+                    br_lab.ReadByte();
+                }
+                imgName = ((int)br_lab.ReadByte()).ToString();
+                for (int i = 0; i < col; i++)
+                {
+                    for (int j = 0; j < rows; j++)
+                    {
+                        temp = br_img.ReadByte();
+                        color = Color.FromArgb(temp, temp, temp);
+                        img.SetPixel(j, i, color);
+                    }
+                }
+            }
+            img.Save(tsPath + "\\" + imgName + ".png");
+        }
+
+        public void Run(string path)
+        {
+            Bitmap img = new Bitmap(path);
+            Example e;
+            double[] x = new double[784];
+            double[] y = new double[10];
+            char[] c = { '\\' ,'.'};
+            string[] temp=path.Split(c);
+            string imgName = temp[temp.Length - 2];
+            Console.WriteLine(imgName);
+            for(int i = 0; i < img.Width; i++)
+            {
+                for(int j = 0; j < img.Height; j++)
+                {
+                    x[j+i*img.Height]=(double)img.GetPixel(j, i).B;
+                }
+            }
+            for (int j = 0; j < 10; j++)
+            {
+                if (Convert.ToInt32(imgName) == j) y[j] = 1.0;
+                else y[j] = 0.0;
+            }
+
+            e = new Example(x, y);
+            ForwardPropagate(e);
+            Output();
         }
 
         public void ForwardPropagate(Example e)
@@ -339,14 +410,14 @@ namespace MNN
             }
         }
 
-        public void BackPropagate(Example[] e)
+        public void BackPropagate(Example[] e,out double Cost)
         {
             double[][,] gradient = new double[3][,];
             gradient[0] = new double[16, 785];
             gradient[1] = new double[16, 17];
             gradient[2] = new double[10, 17];
 
-
+            /*
             //CALCOLA I GRADIENTI DEI COLLEGAMENTI
             for (int i=0;i<17;i++)
             {
@@ -371,15 +442,18 @@ namespace MNN
                     gradient[0][j, i] = OfflineGradient(1, j, i, e);
                 }
             }
+            */
 
+            OfflineGradient(0,e,ref gradient,out Cost);
 
 
             //MODIFICA I COLLEGAMENTI DOPO AVER CALCOLATO TUTTI I GRADIENTI
+            //ERRORE: IL + FA ABBASSARE IL COSTO TOTALE?!
             for (int i = 0; i < 17; i++)
             {
                 for (int j = 0; j < 10; j++)
                 {
-                    weight[2][j, i] -= gradient[2][j, i];
+                    weight[2][j, i] += gradient[2][j, i];
                 }
             }
 
@@ -387,7 +461,7 @@ namespace MNN
             {
                 for (int j = 0; j < 16; j++)
                 {
-                    weight[1][j, i] -= gradient[1][j, i];
+                    weight[1][j, i] += gradient[1][j, i];
                 }
             }
 
@@ -395,7 +469,7 @@ namespace MNN
             {
                 for (int j = 0; j < 16; j++)
                 {
-                    weight[0][j, i] -= gradient[0][j, i];
+                    weight[0][j, i] += gradient[0][j, i];
                 }
             }
 
@@ -403,23 +477,54 @@ namespace MNN
 
         }
 
-        private double OfflineGradient(int layerN, int j, int i, Example[] e)
+        private double OfflineGradient(int layerN, Example[] e, ref double[][,] g, out double Cost)
         {
-            
+            double[][] LocalGradientMEM = new double[3][];
+            LocalGradientMEM[2] = new double[10];
+            LocalGradientMEM[1] = new double[17];
+            LocalGradientMEM[0] = new double[17];
             double s = 0;
-            for(int t = 0; t < e.Length; t++)
+            Cost = 0;
+            for (int t = 0; t < e.Length; t++)
             {
+                
                 ForwardPropagate(e[t]);
-                s += Math.Pow(_momentum, e.Length - t) * LocalGradient(layerN, j, e[t].y) * layer[layerN-1][i];
+                Cost += TotalError(e[t].y);
+                for (int i = 0; i < 17; i++)
+                {
+                    for (int j = 0; j < 10; j++)
+                    {
+                        g[2][j, i] += Math.Pow(_momentum, e.Length - t) * LocalGradient(3, j, e[t].y, ref LocalGradientMEM) * layer[2][i]* _learningFactor;
+                    }
+                }
+
+                for (int i = 0; i < 17; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        g[1][j, i] += Math.Pow(_momentum, e.Length - t) * LocalGradient(2, j, e[t].y, ref LocalGradientMEM) * layer[1][i]* _learningFactor;
+                    }
+                }
+
+                for (int i = 0; i < 785; i++)
+                {
+                    for (int j = 0; j < 16; j++)
+                    {
+                        g[0][j, i] += Math.Pow(_momentum, e.Length - t) * LocalGradient(1, j, e[t].y, ref LocalGradientMEM) * layer[0][i]* _learningFactor;
+                    }
+                }
+                //s += Math.Pow(_momentum, e.Length - t) * LocalGradient(layerN, j, e[t].y) * layer[layerN-1][i];
             }
             return _learningFactor * s;
         }
 
-        private double LocalGradient(int layerN, int j, double[] y)
+        private double LocalGradient(int layerN, int j, double[] y, ref double[][] MEMO)
         {
             if (layerN == 3) //Neurone di output
             {
-                return LocalError(j,y)*SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
+                MEMO[layerN-1][j] = LocalError(j, y) * SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
+                return MEMO[layerN - 1][j];
+                //return LocalError(j,y)*SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
             }
             else
             {
@@ -427,9 +532,12 @@ namespace MNN
                 int N = layer[layerN + 1].Length;
                     for (int k = 0; k < N; k++) //Il layer di output parte da 0
                     {
-                        s += LocalGradient(layerN + 1, k, y) * weight[layerN][k, j]; //COMPLESSITA' ELEVATA, TENTARE TECNICA DI MEMOIZZAZIONE
-                    }
-                return s * SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
+                    //s += LocalGradient(layerN + 1, k, y) * weight[layerN][k, j]; //COMPLESSITA' ELEVATA, TENTARE TECNICA DI MEMOIZZAZIONE
+                    s += MEMO[layerN][k] * weight[layerN][k, j];
+                }
+                MEMO[layerN-1][j] = s * SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
+                return MEMO[layerN-1][j];
+                //return s * SigmoidDerivative(InverseSigmoid(layer[layerN][j]));
             }
         }
     
@@ -449,15 +557,19 @@ namespace MNN
             return s / 2.0;
         }
 
-        //TODO
-        private double CostFunction()
-        {
-            return 0;
-        }
-
         public void Output()
         {
-            for (int i = 0; i < 10; i++) Console.WriteLine(layer[3][i]);
+            double temp1=layer[3][0];
+            int temp2=0;
+            for (int i = 0; i < 10; i++)
+            {
+                if (layer[3][i] > temp1) {
+                    temp1 = layer[3][i];
+                    temp2 = i;
+                }
+                //Console.WriteLine(layer[3][i]);
+            }
+            Console.WriteLine(temp2);
         }
 
         public virtual double Sigmoid(double x)

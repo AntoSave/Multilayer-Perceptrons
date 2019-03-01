@@ -101,6 +101,10 @@ namespace MNN
                             NN.MachineLearning(n);
 
                         }
+                        else if (Args[1] == "run")
+                        {
+                            NN.Run(Args[2]);
+                        }
                         break;
 
                     case "trainingset":
@@ -112,8 +116,31 @@ namespace MNN
                         {
                             NN.LoadTS(Args[2]);
                         }
+                        else if (Args[1] == "extract")
+                        {
+                            NN.ExtractTS(Int32.Parse(Args[2]));
+                        }
                         break;
 
+                    case "test":
+                        
+                            int i = 0;
+                        double[][,] g = new double[3][,];
+                        g[0] = new double[16, 785];
+                        g[1] = new double[16, 17];
+                        g[2] = new double[10, 17];
+                        foreach (double[,] a in g)
+                        {
+                            foreach (double b in a)
+                            {
+                                Console.WriteLine(a.GetLength(0));
+                                Console.WriteLine(a.GetLength(1));
+                            }
+                        }
+
+                        break;
+                    case "stop":
+                        break;
                     default:
                         R = "Comando non riconosciuto. Usare il comando 'help' per mostrare l'elenco dei comandi";
                         Console.WriteLine(R);
